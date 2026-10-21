@@ -23,7 +23,8 @@ def test_get_assignments_filters():
     tools = agent.CanvasTools(FakeCanvas(), TZ, NOW)
     upcoming = tools.get_assignments(course_id=7)
     assert [r["name"] for r in upcoming] == ["Lab Report 4"]
-    assert upcoming[0]["due"] == "Fri Oct 23 7:00 AM"
+    assert upcoming[0]["due"] == "this Friday at 7AM"
+    assert upcoming[0]["due_date"] == "Fri Oct 23 2026"
     by_name = tools.get_assignments(name_contains="lab report")  # name search ignores the date window
     assert [r["name"] for r in by_name] == ["Lab Report 3", "Lab Report 4"]
     assert tools.list_courses()[0]["current_grade"] == "A-"

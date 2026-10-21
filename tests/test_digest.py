@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from canvas_digest.canvas import Assignment
-from canvas_digest.digest import bucket, render_plain
+from canvas_digest.digest import bucket, relative_due, render_plain
 from canvas_digest.texting import split_message
 
 TZ = ZoneInfo("America/New_York")
@@ -38,6 +38,19 @@ def test_render_plain_empty_sections():
     text = render_plain(bucket([], NOW, TZ), NOW, TZ)
     assert "Wednesday, Oct 21" in text
     assert text.count("- Nothing") == 3
+
+
+def test_relative_due():  # NOW is Wednesday Oct 21
+    def rel(month, day, hour, minute=0):
+        return relative_due(datetime(2026, month, day, hour, minute, tzinfo=TZ), NOW, TZ)
+
+    assert rel(10, 21, 22) == "today at 10PM"
+    assert rel(10, 22, 23, 59) == "tomorrow at 11:59PM"
+    assert rel(10, 24, 9) == "this Saturday at 9AM"
+    assert rel(10, 26, 23, 59) == "next Monday at 11:59PM"
+    assert rel(10, 29, 23, 59) == "next Thursday at 11:59PM"
+    assert rel(11, 10, 17) == "Tuesday, 3 weeks from now at 5PM"
+    assert rel(10, 20, 12) == "yesterday at 12PM"
 
 
 def test_split_message_keeps_lines_whole():

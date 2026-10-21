@@ -37,21 +37,43 @@ def bucket(assignments: list[Assignment], now: datetime, tz: ZoneInfo,
     return b
 
 
-def _line(a: Assignment, tz: ZoneInfo, with_day: bool) -> str:
-    due = a.due_at.astimezone(tz)
-    when = due.strftime("%a %-m/%-d %-I:%M%p" if with_day else "%-I:%M%p").replace(":00", "")
-    return f"- {a.course}: {a.name} ({when})"
+def relative_due(due: datetime, now: datetime, tz: ZoneInfo) -> str:
+    """When something is due, relative to now: "today at 5PM", "this Friday at 11:59PM", "next Thursday at 9AM"."""
+    due, today = due.astimezone(tz), now.astimezone(tz).date()
+    days = (due.date() - today).days
+    # Calendar weeks (Monday start) between this week and the due date's week.
+    weeks = ((due.date() - timedelta(days=due.weekday())) - (today - timedelta(days=today.weekday()))).days // 7
+    weekday = due.strftime("%A")
+    if days == 0:
+        day = "today"
+    elif days == 1:
+        day = "tomorrow"
+    elif days == -1:
+        day = "yesterday"
+    elif days < 0:
+        day = f"{-days} days ago"
+    elif weeks == 0:
+        day = f"this {weekday}"
+    elif weeks == 1:
+        day = f"next {weekday}"
+    else:
+        day = f"{weekday}, {weeks} weeks from now"
+    return f"{day} at {due.strftime('%-I:%M%p').replace(':00', '')}"
+
+
+def _line(a: Assignment, now: datetime, tz: ZoneInfo) -> str:
+    return f"- {a.course}: {a.name} (due {relative_due(a.due_at, now, tz)})"
 
 
 def render_plain(b: Buckets, now: datetime, tz: ZoneInfo) -> str:
     """Deterministic digest used as LLM input and as the fallback SMS."""
     parts = [f"Canvas digest for {now.astimezone(tz).strftime('%A, %b %-d')}"]
     sections = [
-        ("DUE TODAY", b.today, False),
-        ("DUE THIS WEEK", b.week, True),
-        ("DUE THIS MONTH", b.month, True),
+        ("DUE TODAY", b.today),
+        ("DUE THIS WEEK", b.week),
+        ("DUE THIS MONTH", b.month),
     ]
-    for title, items, with_day in sections:
+    for title, items in sections:
         parts.append(f"\n{title} ({len(items)})")
-        parts.extend([_line(a, tz, with_day) for a in items] or ["- Nothing"])
+        parts.extend([_line(a, now, tz) for a in items] or ["- Nothing"])
     return "\n".join(parts)

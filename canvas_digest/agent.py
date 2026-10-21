@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .canvas import Assignment, CanvasClient, html_to_text
+from .digest import relative_due
 from .openrouter import chat
 
 MAX_STEPS = 6
@@ -21,7 +22,8 @@ You write the student's morning text message about their Canvas assignments.
 Rules:
 - Keep three sections in this order: "Due today", "This week", "This month". Never drop an assignment from today or this week.
 - For "This month", if there are more than 8 items, list the 8 soonest and say "+N more".
-- Each item: course code, short assignment name, and due day/time. Shorten long names sensibly.
+- Each item: course code, short assignment name, and when it's due. Shorten long names sensibly.
+- Say when things are due exactly as the input words it, relative to today ("tomorrow at 5PM", "next Thursday at 11:59PM"). Never turn it into a calendar date.
 - Open with one short, sweet good-morning line in your voice (e.g. how heavy the day looks); flag anything due within the next few hours.
 - Plain text only: no markdown. Stay under 1200 characters.
 - Do not invent assignments, dates, or courses."""
@@ -33,7 +35,7 @@ Right now it is {now} ({tz}).
 - Use the tools to look things up; never guess assignment names, due dates, or grades.
 - Match course references loosely ("bio", "calc 2", "the english class") against list_courses.
 - Answer in plain text suitable for a text message: short, no markdown, under 600 characters unless the user asks for a full list.
-- Give due dates as weekday + date + time in the student's timezone.
+- Say when things are due relative to today, using the tools' "due" wording as-is ("tomorrow at 5PM", "next Thursday at 11:59PM"). Only give the calendar date ("due_date") if the student asks for it.
 - If something can't be found, say so briefly and suggest what you can look up instead."""
 
 TOOLS = [
@@ -69,14 +71,17 @@ TOOLS = [
 ]
 
 
-def _fmt_due(dt: datetime | None, tz: ZoneInfo) -> str:
-    return dt.astimezone(tz).strftime("%a %b %-d %-I:%M %p") if dt else "no due date"
+def _due_fields(dt: datetime | None, tz: ZoneInfo, now: datetime) -> dict:
+    """Relative wording to say ("next Thursday at 11:59PM"), plus the calendar date if the student asks."""
+    if dt is None:
+        return {"due": "no due date", "due_date": None}
+    return {"due": relative_due(dt, now, tz), "due_date": dt.astimezone(tz).strftime("%a %b %-d %Y")}
 
 
-def _assignment_row(a: Assignment, tz: ZoneInfo) -> dict:
+def _assignment_row(a: Assignment, tz: ZoneInfo, now: datetime) -> dict:
     return {
         "course_id": a.course_id, "assignment_id": a.id, "course": a.course, "name": a.name,
-        "due": _fmt_due(a.due_at, tz), "points": a.points, "submitted": a.submitted, "score": a.score,
+        **_due_fields(a.due_at, tz, now), "points": a.points, "submitted": a.submitted, "score": a.score,
     }
 
 
@@ -119,7 +124,7 @@ class CanvasTools:
             elif needle or start <= a.due_at <= end:
                 rows.append(a)
         rows.sort(key=lambda a: a.due_at or datetime.max.replace(tzinfo=timezone.utc))
-        return [_assignment_row(a, self.tz) for a in rows[:60]]
+        return [_assignment_row(a, self.tz, self.now) for a in rows[:60]]
 
     def get_assignment_details(self, course_id: int, assignment_id: int) -> dict:
         a = self.canvas.assignment_details(course_id, assignment_id)
@@ -127,7 +132,7 @@ class CanvasTools:
         due = a.get("due_at")
         return {
             "name": a["name"],
-            "due": _fmt_due(datetime.fromisoformat(due.replace("Z", "+00:00")) if due else None, self.tz),
+            **_due_fields(datetime.fromisoformat(due.replace("Z", "+00:00")) if due else None, self.tz, self.now),
             "points": a.get("points_possible"),
             "submission_types": a.get("submission_types"),
             "instructions": html_to_text(a.get("description"))[:2000],
