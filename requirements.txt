@@ -1,0 +1,3 @@
+requests>=2.31
+inkbox>=0.7.20
+flask>=3.0
