@@ -37,7 +37,8 @@ def setup(api_key: str, handle: str, app_url: str, rotate_key: bool = False) -> 
         router = inkbox.imessages.get_triage_number()
 
     lines.append(
-        f"\nSTEP: From your iPhone, text exactly this:\n  {router.connect_command}\nto {router.number}\n"
+        # The router's connect_command is a generic template ("connect @your-handle"), so build our own.
+        f"\nSTEP: From your iPhone, text exactly this:\n  connect @{handle}\nto {router.number}\n"
         "The router replies to confirm and sends the bot's contact card. Then text the bot \"hi\" in that "
         "conversation. Until you reply once, the bot can only send short messages, so the full morning digest "
         "needs that first message."
