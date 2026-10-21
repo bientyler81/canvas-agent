@@ -26,6 +26,20 @@ def _parse_time(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
 
 
+def _is_done(sub: dict) -> bool:
+    """Whether the student has actually finished an assignment.
+
+    "graded" alone isn't enough: some instructors pre-enter a 0 for every quiz before it opens,
+    which Canvas reports as graded with no submission.
+    """
+    return (
+        bool(sub.get("submitted_at"))
+        or sub.get("workflow_state") in ("submitted", "pending_review")
+        or bool(sub.get("excused"))
+        or (sub.get("workflow_state") == "graded" and (sub.get("score") or 0) > 0)
+    )
+
+
 def html_to_text(value: str | None) -> str:
     text = re.sub(r"<(br|/p|/li|/div|/h\d)[^>]*>", "\n", value or "", flags=re.I)
     text = html.unescape(re.sub(r"<[^>]+>", "", text))
@@ -91,8 +105,7 @@ class CanvasClient:
                     due_at=_parse_time(a.get("due_at")),
                     points=a.get("points_possible"),
                     url=a.get("html_url", ""),
-                    submitted=sub.get("workflow_state") in ("submitted", "graded", "pending_review")
-                    or bool(sub.get("submitted_at")),
+                    submitted=_is_done(sub),
                     score=sub.get("score"),
                 )
             )

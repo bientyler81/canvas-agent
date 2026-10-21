@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from canvas_digest.canvas import Assignment
+from canvas_digest.canvas import Assignment, _is_done
 from canvas_digest.digest import bucket, relative_due, render_plain
 from canvas_digest.texting import split_message
 
@@ -51,6 +51,16 @@ def test_relative_due():  # NOW is Wednesday Oct 21
     assert rel(10, 29, 23, 59) == "next Thursday at 11:59PM"
     assert rel(11, 10, 17) == "Tuesday, 3 weeks from now at 5PM"
     assert rel(10, 20, 12) == "yesterday at 12PM"
+
+
+def test_is_done():
+    # A quiz the instructor pre-graded 0 before it opened (seen on real Canvas data) is still to do.
+    assert not _is_done({"workflow_state": "graded", "score": 0.0, "submitted_at": None, "attempt": None})
+    assert not _is_done({"workflow_state": "unsubmitted", "submitted_at": None})
+    assert _is_done({"workflow_state": "graded", "score": 10.0, "submitted_at": "2026-10-13T17:18:33Z"})
+    assert _is_done({"workflow_state": "submitted", "submitted_at": "2026-10-13T17:18:33Z"})
+    assert _is_done({"workflow_state": "graded", "score": 8.0, "submitted_at": None})  # graded on paper
+    assert _is_done({"workflow_state": "unsubmitted", "excused": True})
 
 
 def test_split_message_keeps_lines_whole():
