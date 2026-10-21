@@ -62,18 +62,28 @@ def relative_due(due: datetime, now: datetime, tz: ZoneInfo) -> str:
 
 
 def _line(a: Assignment, now: datetime, tz: ZoneInfo) -> str:
-    return f"- {a.course}: {a.name} (due {relative_due(a.due_at, now, tz)})"
+    points = f"{a.points:g} pts, " if a.points else ""
+    return f"- {a.course}: {a.name} ({points}due {relative_due(a.due_at, now, tz)})"
 
 
-def render_plain(b: Buckets, now: datetime, tz: ZoneInfo) -> str:
-    """Deterministic digest used as LLM input and as the fallback SMS."""
+def render_plain(b: Buckets, now: datetime, tz: ZoneInfo, month_limit: int | None = None) -> str:
+    """Deterministic digest: the full version is LLM input; with month_limit it's the fallback text.
+
+    The fallback can't reason about importance, so it keeps the highest-point items (soonest first on ties).
+    """
+    month = b.month
+    if month_limit is not None and len(month) > month_limit:
+        month = sorted(month, key=lambda a: (-(a.points or 0), a.due_at))[:month_limit]
+        month.sort(key=lambda a: a.due_at)
     parts = [f"Canvas digest for {now.astimezone(tz).strftime('%A, %b %-d')}"]
     sections = [
         ("DUE TODAY", b.today),
         ("DUE THIS WEEK", b.week),
-        ("DUE THIS MONTH", b.month),
+        ("DUE THIS MONTH", month),
     ]
     for title, items in sections:
         parts.append(f"\n{title} ({len(items)})")
         parts.extend([_line(a, now, tz) for a in items] or ["- Nothing"])
+    if len(month) < len(b.month):
+        parts.append(f"+{len(b.month) - len(month)} more this month")
     return "\n".join(parts)

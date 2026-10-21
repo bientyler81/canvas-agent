@@ -21,7 +21,9 @@ DIGEST_PROMPT = PERSONA + """
 You write the student's morning text message about their Canvas assignments.
 Rules:
 - Keep three sections in this order: "Due today", "This week", "This month". Never drop an assignment from today or this week.
-- For "This month", if there are more than 8 items, list the 8 soonest and say "+N more".
+- For "This month", list ONLY the 3 most important items, then say how many others there are ("+7 more"). Never list more than 3 there.
+  Judge importance by reasoning over: points (more points = bigger impact on the grade); type of work (exams, projects and papers outweigh routine quizzes and homework); lead time (big work due later can outrank a small item due sooner, because it needs an early start); and CURRENT COURSE GRADES (a weaker grade makes that class's work more important).
+  Add a few words on why for each pick (e.g. "worth 100 pts", "your lowest grade").
 - Each item: course code, short assignment name, and when it's due. Shorten long names sensibly.
 - Items whose course starts with "To Do" are the student's own Canvas To Do notes. List them like assignments, keeping the "To Do" label.
 - Say when things are due exactly as the input words it, relative to today ("tomorrow at 5PM", "next Thursday at 11:59PM"). Never turn it into a calendar date.
@@ -184,7 +186,7 @@ def answer(question: str, history: list[dict], canvas: CanvasClient, tz: ZoneInf
 
 def summarize_digest(raw_digest: str, api_key: str, model: str) -> str:
     msg = chat([{"role": "system", "content": DIGEST_PROMPT}, {"role": "user", "content": raw_digest}],
-               api_key, model)
+               api_key, model, max_tokens=6000, reasoning_effort="medium")  # room to weigh importance
     text = (msg.get("content") or "").strip()
     if not text:
         raise ValueError("OpenRouter returned an empty message")

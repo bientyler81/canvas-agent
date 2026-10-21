@@ -53,6 +53,15 @@ def test_relative_due():  # NOW is Wednesday Oct 21
     assert rel(10, 20, 12) == "yesterday at 12PM"
 
 
+def test_render_plain_month_limit_keeps_highest_points():
+    items = [Assignment(i, 1, "BIO101", f"item{i}", NOW + timedelta(days=8 + i), pts, "", False)
+             for i, pts in enumerate([10, 100, 5, 50, 10])]
+    text = render_plain(bucket(items, NOW, TZ), NOW, TZ, month_limit=3)
+    assert "item1 (100 pts" in text and "item3 (50 pts" in text and "item0 (10 pts" in text
+    assert "item2" not in text and "item4" not in text  # 5 pts dropped; 10-pt tie goes to the sooner one
+    assert "+2 more this month" in text
+
+
 def test_is_done():
     # A quiz the instructor pre-graded 0 before it opened (seen on real Canvas data) is still to do.
     assert not _is_done({"workflow_state": "graded", "score": 0.0, "submitted_at": None, "attempt": None})

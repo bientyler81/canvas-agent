@@ -14,16 +14,26 @@ def _normalize(number: str) -> str:
     return "".join(ch for ch in number if ch.isdigit() or ch == "+")
 
 
+def _course_grades(canvas: CanvasClient) -> str:
+    """Current course grades, so the LLM can weigh assignments in weaker classes more heavily."""
+    lines = []
+    for c in canvas.active_courses():
+        score = next(iter(c.get("enrollments") or []), {}).get("computed_current_score")
+        if score is not None:
+            lines.append(f"- {c.get('course_code') or c['name']}: {score:g}%")
+    return "\n\nCURRENT COURSE GRADES\n" + "\n".join(lines) if lines else ""
+
+
 def run_digest(cfg: Config) -> str:
     now = datetime.now(timezone.utc)
     canvas = CanvasClient(cfg.canvas_base_url, cfg.canvas_token)
     buckets = bucket(canvas.all_assignments(), now, cfg.timezone, cfg.include_submitted)
-    raw = render_plain(buckets, now, cfg.timezone)
     print(f"Found {len(buckets.today)} today, {len(buckets.week)} this week, {len(buckets.month)} this month")
 
-    message = raw
+    message = render_plain(buckets, now, cfg.timezone, month_limit=3)
     if cfg.openrouter_api_key:
         try:
+            raw = render_plain(buckets, now, cfg.timezone) + _course_grades(canvas)
             message = summarize_digest(raw, cfg.openrouter_api_key, cfg.openrouter_model)
         except Exception as exc:  # never skip the text just because the LLM call failed
             print(f"warning: OpenRouter failed, sending plain digest: {exc}")
