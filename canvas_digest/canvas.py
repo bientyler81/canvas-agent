@@ -17,8 +17,9 @@ class Assignment:
     due_at: datetime | None  # timezone-aware; None when the assignment has no due date
     points: float | None
     url: str
-    submitted: bool
+    submitted: bool  # for To Do notes: marked complete in the Canvas planner
     score: float | None = None
+    kind: str = "assignment"  # or "todo" for the student's own Canvas To Do notes
 
 
 def _parse_time(value: str | None) -> datetime | None:
@@ -98,6 +99,33 @@ class CanvasClient:
         self._assignments[course["id"]] = out
         return out
 
+    def todo_notes(self) -> list[Assignment]:
+        """The student's own To Do notes from the Canvas planner, shaped like assignments."""
+        notes = self._get_paginated("/planner_notes", {})
+        # Completion lives in planner overrides; plannable_type has been seen as both "planner_note" and "PlannerNote".
+        done = {
+            o.get("plannable_id")
+            for o in self._get_paginated("/planner/overrides", {})
+            if (o.get("plannable_type") or "").replace("_", "").lower() == "plannernote" and o.get("marked_complete")
+        }
+        codes = {c["id"]: c.get("course_code") or c["name"] for c in self.active_courses()}
+        print(f"Found {len(notes)} To Do notes ({len(done)} marked complete)")
+        return [
+            Assignment(
+                id=n["id"],
+                course_id=n.get("course_id") or 0,
+                course=f"To Do ({codes[n['course_id']]})" if n.get("course_id") in codes else "To Do",
+                name=n.get("title") or "(untitled)",
+                due_at=_parse_time(n.get("todo_date")),
+                points=None,
+                url="",
+                submitted=n["id"] in done,
+                kind="todo",
+            )
+            for n in notes
+            if n.get("workflow_state", "active") == "active"
+        ]
+
     def all_assignments(self) -> list[Assignment]:
         assignments: list[Assignment] = []
         for course in self.active_courses():
@@ -106,6 +134,10 @@ class CanvasClient:
             except requests.HTTPError as exc:
                 # Some courses (e.g. tabs disabled) 403 on assignments; skip rather than fail.
                 print(f"warning: skipping {course.get('name')}: {exc}")
+        try:
+            assignments.extend(self.todo_notes())
+        except requests.HTTPError as exc:
+            print(f"warning: skipping To Do notes: {exc}")
         return assignments
 
     def assignment_details(self, course_id: int, assignment_id: int) -> dict:

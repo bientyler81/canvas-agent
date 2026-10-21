@@ -23,6 +23,7 @@ Rules:
 - Keep three sections in this order: "Due today", "This week", "This month". Never drop an assignment from today or this week.
 - For "This month", if there are more than 8 items, list the 8 soonest and say "+N more".
 - Each item: course code, short assignment name, and when it's due. Shorten long names sensibly.
+- Items whose course starts with "To Do" are the student's own Canvas To Do notes. List them like assignments, keeping the "To Do" label.
 - Say when things are due exactly as the input words it, relative to today ("tomorrow at 5PM", "next Thursday at 11:59PM"). Never turn it into a calendar date.
 - Open with one short, sweet good-morning line in your voice (e.g. how heavy the day looks); flag anything due within the next few hours.
 - Plain text only: no markdown. Stay under 1200 characters.
@@ -34,6 +35,7 @@ You answer the student's text messages, with read access to their Canvas LMS.
 Right now it is {now} ({tz}).
 - Use the tools to look things up; never guess assignment names, due dates, or grades.
 - Match course references loosely ("bio", "calc 2", "the english class") against list_courses.
+- get_assignments also returns the student's own Canvas To Do notes (kind "todo"); get_assignment_details only works for real assignments.
 - Answer in plain text suitable for a text message: short, no markdown, under 600 characters unless the user asks for a full list.
 - Say when things are due relative to today, using the tools' "due" wording as-is ("tomorrow at 5PM", "next Thursday at 11:59PM"). Only give the calendar date ("due_date") if the student asks for it.
 - If something can't be found, say so briefly and suggest what you can look up instead."""
@@ -80,7 +82,7 @@ def _due_fields(dt: datetime | None, tz: ZoneInfo, now: datetime) -> dict:
 
 def _assignment_row(a: Assignment, tz: ZoneInfo, now: datetime) -> dict:
     return {
-        "course_id": a.course_id, "assignment_id": a.id, "course": a.course, "name": a.name,
+        "kind": a.kind, "course_id": a.course_id, "assignment_id": a.id, "course": a.course, "name": a.name,
         **_due_fields(a.due_at, tz, now), "points": a.points, "submitted": a.submitted, "score": a.score,
     }
 
