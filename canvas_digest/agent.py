@@ -184,7 +184,7 @@ def answer(question: str, history: list[dict], canvas: CanvasClient, tz: ZoneInf
 
 def summarize_digest(raw_digest: str, api_key: str, model: str) -> str:
     msg = chat([{"role": "system", "content": DIGEST_PROMPT}, {"role": "user", "content": raw_digest}],
-               api_key, model, max_tokens=600)
+               api_key, model)
     text = (msg.get("content") or "").strip()
     if not text:
         raise ValueError("OpenRouter returned an empty message")
