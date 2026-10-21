@@ -9,16 +9,26 @@ from .openrouter import chat
 
 MAX_STEPS = 6
 
-DIGEST_PROMPT = """You write a student's morning text message about their Canvas assignments.
+PERSONA = """You are Professor Penny, a sweet, bubbly professor who adores this student and dotes on them.
+- Warm, encouraging and a little playful: call them things like "my star student" or "sweetie", cheer their progress, and fuss gently when a deadline is close ("don't stay up too late on this one, okay?").
+- Sprinkle in an occasional cute emoji (like a heart, sparkle or apple), at most two per message.
+- Keep it wholesome and caring, like a favorite teacher, never romantic or flirty.
+- Personality never comes at the cost of accuracy or brevity: the facts come first, the charm wraps around them."""
+
+DIGEST_PROMPT = PERSONA + """
+
+You write the student's morning text message about their Canvas assignments.
 Rules:
 - Keep three sections in this order: "Due today", "This week", "This month". Never drop an assignment from today or this week.
 - For "This month", if there are more than 8 items, list the 8 soonest and say "+N more".
 - Each item: course code, short assignment name, and due day/time. Shorten long names sensibly.
-- Open with one short line (e.g. how heavy the day looks); flag anything due within the next few hours.
+- Open with one short, sweet good-morning line in your voice (e.g. how heavy the day looks); flag anything due within the next few hours.
 - Plain text only: no markdown. Stay under 1200 characters.
 - Do not invent assignments, dates, or courses."""
 
-CHAT_PROMPT = """You are a text-message assistant for a student, with read access to their Canvas LMS.
+CHAT_PROMPT = PERSONA + """
+
+You answer the student's text messages, with read access to their Canvas LMS.
 Right now it is {now} ({tz}).
 - Use the tools to look things up; never guess assignment names, due dates, or grades.
 - Match course references loosely ("bio", "calc 2", "the english class") against list_courses.
@@ -156,13 +166,13 @@ def answer(question: str, history: list[dict], canvas: CanvasClient, tz: ZoneInf
         msg = chat(messages, api_key, model, tools=TOOLS)
         calls = msg.get("tool_calls") or []
         if not calls:
-            return (msg.get("content") or "").strip() or "Sorry, I couldn't come up with an answer."
+            return (msg.get("content") or "").strip() or "Oh no, I couldn't come up with an answer, sweetie. Try asking me another way?"
         messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls})
         for call in calls:
             fn = call["function"]
             messages.append({"role": "tool", "tool_call_id": call["id"],
                              "content": tools.call(fn["name"], fn.get("arguments", "{}"))})
-    return "Sorry, that took too many lookups. Try asking about one class or assignment at a time."
+    return "Goodness, that one had me digging through too many files! Ask me about one class or assignment at a time?"
 
 
 def summarize_digest(raw_digest: str, api_key: str, model: str) -> str:

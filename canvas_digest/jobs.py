@@ -27,7 +27,7 @@ def run_digest(cfg: Config) -> str:
             message = summarize_digest(raw, cfg.openrouter_api_key, cfg.openrouter_model)
         except Exception as exc:  # never skip the text just because the LLM call failed
             print(f"warning: OpenRouter failed, sending plain digest: {exc}")
-    message += "\n\n(Reply with any question about your classes.)"
+    message += "\n\n(Text me any question about your classes! - Prof. Penny)"
 
     if cfg.dry_run:
         print("DRY_RUN set; not sending.")
@@ -72,7 +72,7 @@ def handle_incoming_text(cfg: Config, raw_body: bytes) -> str:
             reply = ask(cfg, question, history)
         except Exception as exc:
             print(f"error answering: {exc}")
-            reply = "Sorry, I hit an error looking that up. Try again in a minute."
+            reply = "Oops, I hit a snag looking that up, sweetie. Try me again in a minute?"
         texter.send(sender, reply)
     finally:
         texter.close()
